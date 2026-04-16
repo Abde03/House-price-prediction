@@ -6,6 +6,12 @@ on:
       - main
   pull_request:
   workflow_dispatch:
+    inputs:
+      force_data_refresh:
+        description: 'Download latest dataset from DATASET_URL secret before retraining'
+        required: false
+        default: true
+        type: boolean
   schedule:
     - cron: '0 2 * * 1'
 
@@ -63,6 +69,20 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: Refresh raw dataset (optional)
+        env:
+          DATASET_URL: ${{ secrets.DATASET_URL }}
+          FORCE_DATA_REFRESH: ${{ github.event_name == 'schedule' || github.event.inputs.force_data_refresh == 'true' }}
+        run: |
+          mkdir -p data/raw
+          if [ "$FORCE_DATA_REFRESH" = "true" ] && [ -n "$DATASET_URL" ]; then
+            echo "Downloading latest dataset from DATASET_URL"
+            curl -fL "$DATASET_URL" -o data/raw/houses_data_eng.csv
+            echo "Dataset refreshed: data/raw/houses_data_eng.csv"
+          else
+            echo "Skipping dataset refresh. Using repository data or existing processed data fallback."
+          fi
 
       - name: Run preprocessing and training pipeline
         env:
