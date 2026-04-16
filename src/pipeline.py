@@ -28,7 +28,17 @@ def main():
     print("=" * 60)
     print(f"Raw file: {raw_path}")
     print(f"Cleaned file: {cleaned_path}")
-    preprocess_data(str(raw_path), str(cleaned_path))
+
+    if raw_path.exists():
+        preprocess_data(str(raw_path), str(cleaned_path))
+        print("Preprocessing completed from raw dataset.")
+    elif cleaned_path.exists():
+        print("Raw dataset not found. Reusing existing cleaned dataset.")
+    else:
+        raise FileNotFoundError(
+            "Neither raw nor cleaned dataset is available. "
+            f"Expected one of: {raw_path} or {cleaned_path}."
+        )
 
     print("\n" + "=" * 60)
     print("TRAINING")
