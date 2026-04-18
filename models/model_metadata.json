@@ -1,18 +1,18 @@
 {
   "experiment_name": "Morocco_House_Price_Prediction",
-  "cleaned_file": "data\\processed\\cleaned_data.csv",
+  "cleaned_file": "data/processed/cleaned_data.csv",
   "best_model_name": "ExtraTreesRegressor (Robust)",
   "best_model_path": "models\\best_model.pkl",
   "best_metrics": {
     "mae": 240929.69066666672,
-    "rmse": 253328.77467513463,
-    "r2": 0.09223339257659369
+    "rmse": 253328.77467513457,
+    "r2": 0.09223339257659424
   },
   "best_cv_metrics": {
     "cv_mae_mean": 530810.0580920635,
     "cv_rmse_mean": 735346.2409772209,
-    "cv_r2_mean": 0.16466296138766873,
-    "cv_r2_std": 0.3203764334324481
+    "cv_r2_mean": 0.16466296138766867,
+    "cv_r2_std": 0.32037643343244815
   },
   "feature_columns": [
     "rooms",
@@ -56,5 +56,5 @@
     "RandomForestRegressor (Robust)",
     "ExtraTreesRegressor (Robust)"
   ],
-  "trained_at_utc": "2026-04-16T08:23:07.113009+00:00"
+  "trained_at_utc": "2026-04-18T11:22:30.239272+00:00"
 }

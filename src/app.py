@@ -21,6 +21,7 @@ METADATA_PATH = BASE_DIR / "models" / "model_metadata.json"
 DATA_PATH = BASE_DIR / "data" / "processed" / "cleaned_data.csv"
 HERO_IMAGE_PATH = BASE_DIR / "assets" / "hero_house.svg"
 RESULTS_DIR = BASE_DIR / "results"
+MODEL_COMPARISON_CSV_PATH = RESULTS_DIR / "model_comparison.csv"
 
 
 @st.cache_resource
@@ -75,6 +76,14 @@ def load_model_metadata():
         with open(METADATA_PATH, "r", encoding="utf-8") as file_handle:
             return json.load(file_handle)
     return {}
+
+
+@st.cache_data
+def load_model_comparison():
+    """Load model comparison metrics generated during training."""
+    if MODEL_COMPARISON_CSV_PATH.exists():
+        return pd.read_csv(MODEL_COMPARISON_CSV_PATH)
+    return pd.DataFrame()
 
 
 @st.cache_data
@@ -549,14 +558,63 @@ def render_summary_table(user_inputs):
 
 def show_visual_insights():
     """Display model result images if available."""
-    insight_tabs = st.tabs(["Feature Importance", "Prediction Fit", "Residuals"])
+    comparison_df = load_model_comparison()
+    insight_tabs = st.tabs(["Model Comparison", "Feature Importance", "Prediction Fit", "Residuals"])
     insight_files = {
         "Feature Importance": RESULTS_DIR / "et_robust_importance.png",
         "Prediction Fit": RESULTS_DIR / "et_robust_actual_vs_pred.png",
         "Residuals": RESULTS_DIR / "et_robust_residuals.png",
     }
 
-    for tab, (label, path) in zip(insight_tabs, insight_files.items()):
+    with insight_tabs[0]:
+        if not comparison_df.empty:
+            ordered_df = comparison_df.sort_values("cv_r2_mean", ascending=False)
+
+            fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+            best_r2_idx = ordered_df["cv_r2_mean"].idxmax()
+            best_rmse_idx = ordered_df["holdout_rmse"].idxmin()
+
+            r2_colors = []
+            for idx, r2_value in ordered_df["cv_r2_mean"].items():
+                if idx == best_r2_idx:
+                    r2_colors.append("#16c172")
+                elif r2_value < 0:
+                    r2_colors.append("#e15a5a")
+                else:
+                    r2_colors.append("#40a9ff")
+
+            rmse_colors = ["#16c172" if idx == best_rmse_idx else "#f5b942" for idx in ordered_df.index]
+
+            axes[0].bar(ordered_df["model_name"], ordered_df["cv_r2_mean"], color=r2_colors, alpha=0.9)
+            axes[0].axhline(0, color="#2f2f2f", linestyle="--", linewidth=1.5)
+            axes[0].set_title("CV R2 Mean (higher is better)", fontweight="bold")
+            axes[0].set_ylabel("CV R2 Mean")
+            axes[0].tick_params(axis="x", rotation=12)
+            axes[0].grid(True, axis="y", alpha=0.25)
+
+            axes[1].bar(ordered_df["model_name"], ordered_df["holdout_rmse"], color=rmse_colors, alpha=0.9)
+            axes[1].set_title("Holdout RMSE (lower is better)", fontweight="bold")
+            axes[1].set_ylabel("RMSE")
+            axes[1].tick_params(axis="x", rotation=12)
+            axes[1].grid(True, axis="y", alpha=0.25)
+
+            plt.tight_layout()
+            st.pyplot(fig, clear_figure=True)
+
+            st.dataframe(
+                ordered_df[["model_name", "cv_r2_mean", "cv_r2_std", "holdout_r2", "holdout_rmse", "holdout_mae"]],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            plot_path = RESULTS_DIR / "model_comparison.png"
+            if plot_path.exists():
+                st.image(str(plot_path), caption="Model Comparison", use_container_width=True)
+            else:
+                st.info("Model comparison is not available yet. Run the training pipeline first.")
+
+    for tab, (label, path) in zip(insight_tabs[1:], insight_files.items()):
         with tab:
             if path.exists():
                 st.image(str(path), caption=label, use_container_width=True)

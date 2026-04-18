@@ -32,6 +32,7 @@ BEST_MODEL_PATH = MODEL_DIR / "best_model.pkl"
 FEATURE_SCHEMA_PATH = MODEL_DIR / "feature_schema.json"
 MODEL_METADATA_PATH = MODEL_DIR / "model_metadata.json"
 MODEL_COMPARISON_PATH = RESULTS_DIR / "model_comparison.csv"
+MODEL_COMPARISON_PLOT_PATH = RESULTS_DIR / "model_comparison.png"
 
 
 MODEL_FEATURES = [
@@ -258,6 +259,49 @@ def plot_residuals(y_true, y_pred, model_name: str, output_path: str = "results/
     return output_path
 
 
+def plot_model_comparison(comparison_df: pd.DataFrame, output_path: str = "results/model_comparison.png"):
+    """Plot all model metrics side by side for quick ranking."""
+    if comparison_df.empty:
+        return None
+
+    output_file = Path(output_path)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    plot_df = comparison_df.sort_values("cv_r2_mean", ascending=True).copy()
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+    best_r2_idx = plot_df["cv_r2_mean"].idxmax()
+    best_rmse_idx = plot_df["holdout_rmse"].idxmin()
+
+    r2_colors = []
+    for idx, r2_value in plot_df["cv_r2_mean"].items():
+        if idx == best_r2_idx:
+            r2_colors.append("#16c172")
+        elif r2_value < 0:
+            r2_colors.append("#e15a5a")
+        else:
+            r2_colors.append("#40a9ff")
+
+    rmse_colors = ["#16c172" if idx == best_rmse_idx else "#f5b942" for idx in plot_df.index]
+
+    axes[0].barh(plot_df["model_name"], plot_df["cv_r2_mean"], color=r2_colors, alpha=0.9)
+    axes[0].axvline(0, color="#2f2f2f", linestyle="--", linewidth=1.5)
+    axes[0].set_title("Cross-Validation R2 (higher is better)", fontsize=12, fontweight="bold")
+    axes[0].set_xlabel("CV R2 Mean")
+    axes[0].grid(True, axis="x", alpha=0.3)
+
+    axes[1].barh(plot_df["model_name"], plot_df["holdout_rmse"], color=rmse_colors, alpha=0.9)
+    axes[1].set_title("Holdout RMSE (lower is better)", fontsize=12, fontweight="bold")
+    axes[1].set_xlabel("Holdout RMSE")
+    axes[1].grid(True, axis="x", alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(output_file, dpi=300, bbox_inches="tight")
+    plt.close()
+    return str(output_file)
+
+
 def build_model_candidates() -> list[CandidateModel]:
     """Return the models that are compared during training."""
     return [
@@ -455,6 +499,7 @@ def run_training_pipeline(
     comparison_path = Path(MODEL_COMPARISON_PATH)
     comparison_path.parent.mkdir(parents=True, exist_ok=True)
     comparison_df.to_csv(comparison_path, index=False)
+    comparison_plot_path = plot_model_comparison(comparison_df, str(MODEL_COMPARISON_PLOT_PATH))
 
     metadata = {
         "experiment_name": experiment_name,
@@ -479,6 +524,8 @@ def run_training_pipeline(
         mlflow.log_metric("best_cv_r2_mean", float(best_cv_metrics["cv_r2_mean"]))
         mlflow.log_metric("best_cv_r2_std", float(best_cv_metrics["cv_r2_std"]))
         mlflow.log_artifact(str(comparison_path))
+        if comparison_plot_path:
+            mlflow.log_artifact(comparison_plot_path)
         mlflow.log_artifact(str(MODEL_METADATA_PATH))
 
     print("\n" + "=" * 60)
